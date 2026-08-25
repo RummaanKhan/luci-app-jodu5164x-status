@@ -2,9 +2,13 @@
 # jodu5164x_lock.sh
 # Locks or unlocks 5G NR Cell on Sercomm JODU5164x using cricli
 
-IP=$(/sbin/uci -q get jodu5164x.main.ip || echo "192.168.225.1")
+IP=$(/sbin/uci -q get jodu5164x.main.ip)
+[ -z "$IP" ] && IP=$(/sbin/uci -q get jodu5164x.main.host)
+[ -z "$IP" ] && IP="192.168.225.1"
 USER=$(/sbin/uci -q get jodu5164x.main.user)
+[ -z "$USER" ] && USER=$(/sbin/uci -q get jodu5164x.main.telnet_username)
 PASS=$(/sbin/uci -q get jodu5164x.main.pass)
+[ -z "$PASS" ] && PASS=$(/sbin/uci -q get jodu5164x.main.telnet_password)
 
 NR_ARFCN="$1"
 NR_PCI="$2"

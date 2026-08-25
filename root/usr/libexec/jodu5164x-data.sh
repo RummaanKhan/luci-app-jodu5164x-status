@@ -1,6 +1,7 @@
 #!/bin/sh
 
 IP=$(/sbin/uci -q get jodu5164x.main.ip)
+[ -z "$IP" ] && IP=$(/sbin/uci -q get jodu5164x.main.host)
 [ -z "$IP" ] && IP="192.168.225.1"
 
 if [ -f /tmp/odu5164x_force_setup ]; then
@@ -13,41 +14,50 @@ if [ -f /tmp/odu5164x_force_setup ]; then
     fi
     
     IP=$(/sbin/uci -q get jodu5164x.main.ip)
+    [ -z "$IP" ] && IP=$(/sbin/uci -q get jodu5164x.main.host)
     [ -z "$IP" ] && IP="192.168.225.1"
     
-    touch /tmp/odu5164x_setup.lock
+    echo "PROVISIONING" > /tmp/odu5164x_setup.lock
     /usr/libexec/jodu5164x-setup.sh >/dev/null 2>&1 &
-    echo '{"server_link":"CONFIGURING"}'
+    echo '{"server_link":"PROVISIONING"}'
     exit 0
 fi
 
 STATUS=$(wget -q -O - -T 3 "http://$IP:8080/status.txt" 2>/dev/null | tr -d '\r')
 
 if ! echo "$STATUS" | grep -q -e '---UPTIME---' || ! echo "$STATUS" | grep -q -e '5164x'; then
+    FAIL_COUNT=$(cat /tmp/odu_fail_count 2>/dev/null || echo "0")
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+    echo "$FAIL_COUNT" > /tmp/odu_fail_count
+
     if [ -f /tmp/odu5164x_setup.lock ]; then
-        echo '{"server_link":"CONFIGURING"}'
+        STATE=$(cat /tmp/odu5164x_setup.lock)
+        [ -z "$STATE" ] && STATE="PROVISIONING"
+        echo "{\"server_link\":\"$STATE\"}"
+        exit 0
+    elif [ "$FAIL_COUNT" -ge 4 ]; then
+        echo "0" > /tmp/odu_fail_count
+        echo "PROVISIONING" > /tmp/odu5164x_setup.lock
+        /usr/libexec/jodu5164x-setup.sh >/dev/null 2>&1 &
+        echo '{"server_link":"PROVISIONING"}'
         exit 0
     else
-        touch /tmp/odu5164x_setup.lock
-        /usr/libexec/jodu5164x-setup.sh >/dev/null 2>&1 &
-        echo '{"server_link":"INITIALIZING"}'
+        echo '{"server_link":"OFFLINE"}'
         exit 0
     fi
+else
+    rm -f /tmp/odu_fail_count
+    rm -f /tmp/odu5164x_setup.lock
 fi
 
-rm -f /tmp/odu5164x_setup.lock
-
-# Strip CRLF / \r from STATUS to prevent JSON parse failures
 STATUS=$(printf '%s' "$STATUS" | tr -d '\r')
 
-# Section Extractions
 BNRINFO=$(echo "$STATUS" | sed -n '/---BNRINFO---/,/---NRCAINFO---/p')
 NRCAINFO=$(echo "$STATUS" | sed -n '/---NRCAINFO---/,/---CRI_CELL---/p')
 CRI_CELL=$(echo "$STATUS" | sed -n '/---CRI_CELL---/,/---CRI_BAND---/p')
 CRI_BAND=$(echo "$STATUS" | sed -n '/---CRI_BAND---/,/---BNRCELLH---/p')
 BNRCELLH=$(echo "$STATUS" | sed -n '/---BNRCELLH---/,/---CPU---/p')
 
-# 1. Primary Serving Cell Metrics
 NR5G_INFO=$(echo "$CRI_CELL" | sed -n '/---------- NR5G Info ----------/,$p')
 
 PCID=$(echo "$NR5G_INFO" | grep -i '^pci:' | awk -F':' '{print $2}' | tr -d ' ' | head -n1)
@@ -121,7 +131,6 @@ TA=$(echo "$BNRINFO" | grep -i 'TIMING' | awk -F'[: ]+' '{print $NF}' | tr -d ' 
 DUPLEX="TDD"
 STATE="CONNECTED"
 
-# 2. Secondary Cell (Carrier Aggregation)
 SCC_LINE=$(echo "$NRCAINFO" | grep -i 'SCC 1')
 if [ -n "$SCC_LINE" ] && ! echo "$SCC_LINE" | grep -q '<NA>'; then
     SCC_BAND=$(echo "$SCC_LINE" | grep -o -E 'Band:[a-zA-Z0-9]+' | awk -F':' '{print $2}')
@@ -155,7 +164,6 @@ else
     SCC_MIMO="NA"
 fi
 
-# 3. Neighbouring Cells Parsing (From BNRCELLH)
 NEIGHBORS_JSON=$(printf '%s\n' "$BNRCELLH" | awk '
     BEGIN { printf "["; first=1 }
     NF==5 && $1 ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/ && $3 ~ /^[0-9]+$/ {
@@ -172,7 +180,6 @@ NEIGHBORS_JSON=$(printf '%s\n' "$BNRCELLH" | awk '
 ')
 [ -z "$NEIGHBORS_JSON" ] && NEIGHBORS_JSON="[]"
 
-# 4. Hardware System Stats
 CPU=$(echo "$STATUS" | sed -n '/---CPU---/,/---TEMP---/p' | grep -v -e '---' | head -n1 | tr -d '\r\n')
 [ -z "$CPU" ] && CPU="0"
 

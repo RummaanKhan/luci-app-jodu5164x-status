@@ -1,17 +1,25 @@
 #!/bin/sh
 
-touch /tmp/odu5164x_setup.lock
-trap 'rm -f /tmp/odu5164x_setup.lock' EXIT INT TERM HUP
+for pid in $(pgrep -f jodu5164x-setup.sh 2>/dev/null); do
+    [ "$pid" != "$$" ] && kill -9 $pid 2>/dev/null
+done
+killall -9 nc 2>/dev/null
 
-IP=$(/sbin/uci -q get jodu5164x.main.ip || echo "192.168.225.1")
+touch /tmp/odu5164x_setup.lock
+trap 'rm -f /tmp/odu5164x_setup.lock' EXIT INT TERM
+
+IP=$(/sbin/uci -q get jodu5164x.main.ip)
+[ -z "$IP" ] && IP=$(/sbin/uci -q get jodu5164x.main.host)
+[ -z "$IP" ] && IP="192.168.225.1"
 USER=$(/sbin/uci -q get jodu5164x.main.user)
+[ -z "$USER" ] && USER=$(/sbin/uci -q get jodu5164x.main.telnet_username)
 PASS=$(/sbin/uci -q get jodu5164x.main.pass)
+[ -z "$PASS" ] && PASS=$(/sbin/uci -q get jodu5164x.main.telnet_password)
 
 NR_ARFCN=$(/sbin/uci -q get jodu5164x.main.arfcn)
 NR_PCI=$(/sbin/uci -q get jodu5164x.main.pci)
 
 (
-# Authenticate only if password is configured
 if [ -n "$PASS" ]; then
     sleep 2
     printf '%s\r\n' "$PASS"
@@ -22,22 +30,21 @@ else
     sleep 1
 fi
 
-# Apply Cell Lock if configured (using 2.5 proven syntax)
 if [ -n "$NR_ARFCN" ] && [ -n "$NR_PCI" ]; then
     printf 'cricli set_nr5g_cell_config 0 %s %s 1 0 8192 0 0 0 0 0 0\r\n' "$NR_PCI" "$NR_ARFCN"
     sleep 2
 fi
 
-# Stop any previous monitor loop in /tmp/ (kill all instances)
 echo "kill -9 \$(cat /tmp/odu_monitor.pid 2>/dev/null) 2>/dev/null"
 echo "killall -9 odu_monitor.sh 2>/dev/null"
 echo "pkill -9 -f odu_monitor 2>/dev/null"
+echo "killall -9 httpd 2>/dev/null"
 echo "rm -f /tmp/odu_monitor.pid"
 sleep 1
 
-# Deploy lightweight, non-invasive monitor loop completely in /tmp/
 echo "cat << 'EOF' > /tmp/odu_monitor.sh"
 echo "#!/bin/sh"
+echo "trap '' HUP"
 echo "echo \$\$ > /tmp/odu_monitor.pid"
 echo "mkdir -p /tmp/www"
 echo "COUNT=0"
@@ -95,7 +102,7 @@ sleep 1
 
 echo "chmod +x /tmp/odu_monitor.sh"
 sleep 1
-echo "/tmp/odu_monitor.sh >/dev/null 2>&1 &"
+echo "( /tmp/odu_monitor.sh </dev/null >/dev/null 2>&1 & ) &"
 sleep 1
 echo "exit"
 sleep 1

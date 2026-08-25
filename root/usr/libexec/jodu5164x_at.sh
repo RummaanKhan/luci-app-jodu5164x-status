@@ -4,9 +4,13 @@
 CMD="$1"
 [ -z "$CMD" ] && exit 1
 
-IP=$(/sbin/uci -q get jodu5164x.main.ip || echo "192.168.225.1")
+IP=$(/sbin/uci -q get jodu5164x.main.ip)
+[ -z "$IP" ] && IP=$(/sbin/uci -q get jodu5164x.main.host)
+[ -z "$IP" ] && IP="192.168.225.1"
 USER=$(/sbin/uci -q get jodu5164x.main.user)
+[ -z "$USER" ] && USER=$(/sbin/uci -q get jodu5164x.main.telnet_username)
 PASS=$(/sbin/uci -q get jodu5164x.main.pass)
+[ -z "$PASS" ] && PASS=$(/sbin/uci -q get jodu5164x.main.telnet_password)
 
 # Determine whether to wrap with atcli or run directly
 FIRST_WORD=$(echo "$CMD" | awk '{print toupper($1)}')

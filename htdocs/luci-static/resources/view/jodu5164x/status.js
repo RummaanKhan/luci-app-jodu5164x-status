@@ -21,6 +21,7 @@ return view.extend({
         style.innerHTML = `
             @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
             
+
             #cbi-jodu5164x {
                 font-family: 'Inter', sans-serif;
                 color: #e2e8f0;
@@ -448,10 +449,11 @@ return view.extend({
         }
 
         function openSettingsModal() {
+            uci.unload('jodu5164x');
             uci.load('jodu5164x').then(function() {
-                var ip = uci.get('jodu5164x', 'main', 'host') || '192.168.225.1';
-                var user = uci.get('jodu5164x', 'main', 'telnet_username') || '';
-                var pass = uci.get('jodu5164x', 'main', 'telnet_password') || '';
+                var ip = uci.get('jodu5164x', 'main', 'ip') || uci.get('jodu5164x', 'main', 'host') || '192.168.225.1';
+                var user = uci.get('jodu5164x', 'main', 'user') || uci.get('jodu5164x', 'main', 'telnet_username') || '';
+                var pass = uci.get('jodu5164x', 'main', 'pass') || uci.get('jodu5164x', 'main', 'telnet_password') || '';
                 
                 var body = document.createElement('div');
                 body.innerHTML = `
@@ -616,7 +618,7 @@ return view.extend({
                 
                 var stateEl = document.getElementById('ui-state');
                 var iconEl = document.getElementById('icon-conn');
-                var secondsLeft = 50; 
+                var secondsLeft = 60; 
                 
                 if (stateEl && iconEl) {
                     stateEl.style.color = '#ef4444'; 
@@ -745,9 +747,10 @@ return view.extend({
                         }
                     }
 
-                    if (data.server_link === 'INITIALIZING' || data.server_link === 'CONFIGURING') {
+                    if (data.server_link === 'PROVISIONING') {
                         if (stateEl) {
-                            stateEl.innerText = 'PROVISIONING DEVICE';
+                            stateEl.className = '';
+                            stateEl.innerText = 'PROVISIONING';
                             stateEl.style.color = '#2dd4bf'; 
                             stateEl.style.textShadow = '0 0 15px rgba(45,212,191,0.4)'; 
                         }
@@ -759,6 +762,7 @@ return view.extend({
 
                     if (data.server_link === 'OFFLINE') {
                         if (stateEl) {
+                            stateEl.className = '';
                             stateEl.innerText = 'LINK DOWN';
                             stateEl.style.color = '#f43f5e';
                             stateEl.style.textShadow = '0 0 15px rgba(244,63,94,0.4)'; 
@@ -770,6 +774,7 @@ return view.extend({
                     }
 
                     if (stateEl) {
+                        stateEl.className = '';
                         stateEl.innerText = 'LINK ACTIVE';
                         stateEl.style.color = '#4ade80';
                         stateEl.style.textShadow = '0 0 15px rgba(74,222,128,0.4)'; 
@@ -791,7 +796,6 @@ return view.extend({
                         }
                     }
 
-                    // Cache valid parameters to prevent random flickering to '--' during RRC state transitions
                     if (data.duplex && data.duplex !== '--') window.lastKnownDuplex = data.duplex;
                     if (data.band && data.band !== '--') window.lastKnownBand = data.band;
                     if (data.bw && data.bw !== '--') window.lastKnownBw = data.bw;
@@ -861,7 +865,6 @@ return view.extend({
                         uiBler.style.color = blerCol;
                     }
 
-                    // Calculate Signal Quality percentage using JODU52140 formula
                     var qRsrp = Math.max(0, Math.min(100, ((rsrp + 115) / 55) * 100));
                     var qRsrq = Math.max(0, Math.min(100, ((rsrq + 18) / 9) * 100));
                     var qSinr = Math.max(0, Math.min(100, (sinr / 30) * 100));
@@ -897,7 +900,6 @@ return view.extend({
                     var iSig = document.getElementById('icon-sig');
                     if (iSig) iSig.innerHTML = sigSvg;
 
-                    // Session Data Usage
                     var rx = parseInt(data.rx_bytes, 10) || 0;
                     var tx = parseInt(data.tx_bytes, 10) || 0;
                     var uiRx = document.getElementById('ui-rx-bytes');
@@ -905,7 +907,6 @@ return view.extend({
                     if (uiRx) uiRx.innerText = formatBytes(rx);
                     if (uiTx) uiTx.innerText = formatBytes(tx);
 
-                    // Secondary Cell
                     if (data.scc_pcid && data.scc_pcid !== "0" && data.scc_pcid !== "--") {
                         el = document.getElementById('ui-ca-status'); if (el) { el.innerText = 'Active (CA)'; el.style.color = '#03dac6'; }
                         el = document.getElementById('ui-scc-band'); if (el) el.innerText = data.scc_band || 'n258';
@@ -932,13 +933,18 @@ return view.extend({
                         el = document.getElementById('ui-scc-bler'); if (el) el.innerText = 'NA';
                     }
 
-                    // Neighbour Cells Population
                     var nTbody = document.getElementById('ui-neighbor-tbody');
                     var nCountEl = document.getElementById('ui-neigh-count');
                     
                     if (nTbody) {
                         if (data.neighbors && Array.isArray(data.neighbors) && data.neighbors.length > 0) {
                             if (nCountEl) nCountEl.innerText = data.neighbors.length;
+                            
+                            data.neighbors.sort(function(a, b) {
+                                var rA = parseInt(a.rsrp, 10) || -150;
+                                var rB = parseInt(b.rsrp, 10) || -150;
+                                return rB - rA; 
+                            });
                             
                             var rows = '';
                             data.neighbors.forEach(function(n, idx) {

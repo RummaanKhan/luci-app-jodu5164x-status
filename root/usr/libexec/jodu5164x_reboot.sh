@@ -1,9 +1,13 @@
 #!/bin/sh
 # /usr/libexec/jodu5164x_reboot.sh - Safely reboots JODU5164x ODU
 
-IP=$(/sbin/uci -q get jodu5164x.main.ip || echo "192.168.225.1")
+IP=$(/sbin/uci -q get jodu5164x.main.ip)
+[ -z "$IP" ] && IP=$(/sbin/uci -q get jodu5164x.main.host)
+[ -z "$IP" ] && IP="192.168.225.1"
 USER=$(/sbin/uci -q get jodu5164x.main.user)
+[ -z "$USER" ] && USER=$(/sbin/uci -q get jodu5164x.main.telnet_username)
 PASS=$(/sbin/uci -q get jodu5164x.main.pass)
+[ -z "$PASS" ] && PASS=$(/sbin/uci -q get jodu5164x.main.telnet_password)
 
 (
     if [ -n "$USER" ] && [ "$USER" != "none" ]; then
