@@ -797,41 +797,58 @@ return view.extend({
                     }
 
                     if (data.duplex && data.duplex !== '--') window.lastKnownDuplex = data.duplex;
-                    if (data.band && data.band !== '--') window.lastKnownBand = data.band;
-                    if (data.bw && data.bw !== '--') window.lastKnownBw = data.bw;
-                    if (data.arfcn && data.arfcn !== '--') window.lastKnownArfcn = data.arfcn;
-                    if (data.pcid && data.pcid !== '--') window.lastKnownPcid = data.pcid;
-                    if (data.mod && data.mod !== '--') window.lastKnownMod = data.mod;
-                    if (data.mimo && data.mimo !== '--') window.lastKnownMimo = data.mimo;
+                    var isUp = (data.server_link !== 'OFFLINE' && data.server_link !== 'PROVISIONING');
 
-                    var curDuplex = (data.duplex && data.duplex !== '--') ? data.duplex : (window.lastKnownDuplex || 'TDD');
-                    var curBand = (data.band && data.band !== '--') ? data.band : (window.lastKnownBand || 'n78');
-                    var curBw = (data.bw && data.bw !== '--') ? data.bw : (window.lastKnownBw || '100');
-                    var curArfcn = (data.arfcn && data.arfcn !== '--') ? data.arfcn : (window.lastKnownArfcn || '--');
-                    var curPcid = (data.pcid && data.pcid !== '--') ? data.pcid : (window.lastKnownPcid || '--');
-                    var curMod = (data.mod && data.mod !== '--') ? data.mod : (window.lastKnownMod || '256QAM');
-                    var curMimo = (data.mimo && data.mimo !== '--') ? data.mimo : (window.lastKnownMimo || '4x4');
+                    var getVal = function(key, conditionFn) {
+                        var val = data[key];
+                        var isValid = val && val !== '--' && val !== 'NA' && (!conditionFn || conditionFn(val));
+                        
+                        if (isValid) {
+                            window['lastKnown_' + key] = val;
+                            return val;
+                        } else if (isUp && window['lastKnown_' + key] !== undefined) {
+                            return window['lastKnown_' + key];
+                        } else {
+                            return '--';
+                        }
+                    };
+
+                    var curDuplex = getVal('duplex');
+                    var curBand = getVal('band');
+                    var curBw = getVal('bw');
+                    var curArfcn = getVal('arfcn');
+                    var curPcid = getVal('pcid');
+                    var curMod = getVal('mod', function(v) { return v.indexOf('--') === -1; });
+                    var curMimo = getVal('mimo', function(v) { return v.indexOf('--') === -1; });
+                    var curBler = getVal('bler', function(v) { return v.indexOf('--') === -1; });
+                    var curRsrp = getVal('rsrp');
+                    var curRsrq = getVal('rsrq');
+                    var curSinr = getVal('sinr');
+
+                    if (curMod === '--') curMod = 'DL:-- UL:--';
+                    if (curMimo === '--') curMimo = 'DL:-- UL:--';
+                    if (curBler === '--') curBler = 'DL:-- UL:--';
 
                     var el;
                     el = document.getElementById('ui-duplex'); if (el) el.innerText = curDuplex;
                     el = document.getElementById('ui-band'); if (el) el.innerText = curBand;
-                    el = document.getElementById('ui-bw'); if (el) el.innerText = (curBw && curBw !== '--' ? curBw + ' MHz' : '--');
+                    el = document.getElementById('ui-bw'); if (el) el.innerText = (curBw !== '--' ? curBw + ' MHz' : '--');
                     el = document.getElementById('ui-arfcn'); if (el) el.innerText = curArfcn;
                     el = document.getElementById('ui-pcid'); if (el) el.innerText = curPcid;
                     el = document.getElementById('ui-mod'); if (el) el.innerText = curMod;
                     el = document.getElementById('ui-mimo'); if (el) el.innerText = curMimo;
 
-                    var rsrp = parseInt(data.rsrp, 10) || -130;
-                    var rsrq = parseInt(data.rsrq, 10) || -20;
-                    var sinr = parseInt(data.sinr, 10) || 0;
+                    var rsrp = parseInt(curRsrp, 10); if (isNaN(rsrp)) rsrp = -130;
+                    var rsrq = parseInt(curRsrq, 10); if (isNaN(rsrq)) rsrq = -20;
+                    var sinr = parseInt(curSinr, 10); if (isNaN(sinr)) sinr = 0;
 
                     var rsrpCol = '#f43f5e'; 
                     if (rsrp >= -85) rsrpCol = '#4ade80'; 
                     else if (rsrp >= -100) rsrpCol = '#fbbf24'; 
                     var uiRsrp = document.getElementById('ui-rsrp');
                     if (uiRsrp) {
-                        uiRsrp.innerText = rsrp + ' dBm';
-                        uiRsrp.style.color = rsrpCol;
+                        uiRsrp.innerText = (curRsrp === '--' ? '--' : rsrp + ' dBm');
+                        uiRsrp.style.color = (curRsrp === '--' ? '#94a3b8' : rsrpCol);
                     }
 
                     var rsrqCol = '#f43f5e';
@@ -839,8 +856,8 @@ return view.extend({
                     else if (rsrq >= -13) rsrqCol = '#fbbf24';
                     var uiRsrq = document.getElementById('ui-rsrq');
                     if (uiRsrq) {
-                        uiRsrq.innerText = rsrq + ' dB';
-                        uiRsrq.style.color = rsrqCol;
+                        uiRsrq.innerText = (curRsrq === '--' ? '--' : rsrq + ' dB');
+                        uiRsrq.style.color = (curRsrq === '--' ? '#94a3b8' : rsrqCol);
                     }
 
                     var sinrCol = '#f43f5e';
@@ -848,21 +865,48 @@ return view.extend({
                     else if (sinr >= 5) sinrCol = '#fbbf24';
                     var uiSinr = document.getElementById('ui-sinr');
                     if (uiSinr) {
-                        uiSinr.innerText = sinr + ' dB';
-                        uiSinr.style.color = sinrCol;
+                        uiSinr.innerText = (curSinr === '--' ? '--' : sinr + ' dB');
+                        uiSinr.style.color = (curSinr === '--' ? '#94a3b8' : sinrCol);
                     }
 
                     var uiBler = document.getElementById('ui-bler');
                     if (uiBler) {
-                        var blerVal = data.bler || '--';
-                        uiBler.innerText = blerVal;
-                        var blerNum = parseFloat(blerVal);
-                        var blerCol = '#4ade80';
-                        if (!isNaN(blerNum)) {
-                            if (blerNum >= 10) blerCol = '#f43f5e';
-                            else if (blerNum > 0) blerCol = '#fbbf24';
+                        var blerVal = curBler;
+                        if (blerVal !== 'DL:-- UL:--' && blerVal !== '--' && blerVal !== 'NA') {
+                            var dMatch = blerVal.match(/DL:([0-9.]+)%/);
+                            var uMatch = blerVal.match(/UL:([0-9.]+)%/);
+                            
+                            var getBlerCol = function(val) {
+                                if (isNaN(val)) return '#4ade80';
+                                if (val >= 10) return '#f43f5e';
+                                if (val > 0) return '#fbbf24';
+                                return '#4ade80';
+                            };
+
+                            if (dMatch || uMatch) {
+                                var dStr = 'DL:--';
+                                if (dMatch) {
+                                    var dCol = getBlerCol(parseFloat(dMatch[1]));
+                                    dStr = 'DL:<span style="color:' + dCol + '">' + dMatch[1] + '%</span>';
+                                }
+                                
+                                var uStr = 'UL:--';
+                                if (uMatch) {
+                                    var uCol = getBlerCol(parseFloat(uMatch[1]));
+                                    uStr = 'UL:<span style="color:' + uCol + '">' + uMatch[1] + '%</span>';
+                                }
+                                
+                                uiBler.innerHTML = dStr + ' ' + uStr;
+                                uiBler.style.color = ''; 
+                            } else {
+                                var oldNum = parseFloat(blerVal);
+                                uiBler.innerText = blerVal;
+                                uiBler.style.color = getBlerCol(oldNum);
+                            }
+                        } else {
+                            uiBler.innerText = blerVal;
+                            uiBler.style.color = (blerVal === 'DL:-- UL:--' || blerVal === '--' ? '#94a3b8' : '#4ade80');
                         }
-                        uiBler.style.color = blerCol;
                     }
 
                     var qRsrp = Math.max(0, Math.min(100, ((rsrp + 115) / 55) * 100));
