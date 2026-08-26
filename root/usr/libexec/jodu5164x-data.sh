@@ -25,7 +25,7 @@ fi
 
 STATUS=$(wget -q -O - -T 3 "http://$IP:8080/status.txt" 2>/dev/null | tr -d '\r')
 
-if ! echo "$STATUS" | grep -q -e '---UPTIME---' || ! echo "$STATUS" | grep -q -e '5164x'; then
+if ! echo "$STATUS" | grep -q -e '---UPTIME---' || ! echo "$STATUS" | grep -q -e '5164x-1.0.0-r2'; then
     FAIL_COUNT=$(cat /tmp/odu_fail_count 2>/dev/null || echo "0")
     FAIL_COUNT=$((FAIL_COUNT + 1))
     echo "$FAIL_COUNT" > /tmp/odu_fail_count
@@ -100,27 +100,49 @@ else
 fi
 
 DL_MOD_NUM=$(echo "$NRCAINFO" | grep -i 'PCC' | grep -o -E 'DL_MOD:[0-9]+' | awk -F':' '{print $2}' | head -n1)
-case "$DL_MOD_NUM" in
-    0) MOD="QPSK" ;;
-    1) MOD="16QAM" ;;
-    2) MOD="64QAM" ;;
-    3) MOD="256QAM" ;;
-    *) MOD=$(echo "$NRCAINFO" | grep -i 'PCC' | grep -o -E '(256QAM|64QAM|16QAM|QPSK)' | head -n1) ;;
-esac
-[ -z "$MOD" ] && MOD="--"
+UL_MOD_NUM=$(echo "$NRCAINFO" | grep -i 'PCC' | grep -o -E 'UL_MOD:[0-9]+' | awk -F':' '{print $2}' | head -n1)
+
+get_mod_string() {
+    case "$1" in
+        0) echo "QPSK" ;;
+        1) echo "16QAM" ;;
+        2) echo "64QAM" ;;
+        3) echo "256QAM" ;;
+        *) echo "--" ;;
+    esac
+}
+
+DL_MOD_STR=$(get_mod_string "$DL_MOD_NUM")
+UL_MOD_STR=$(get_mod_string "$UL_MOD_NUM")
+[ "$DL_MOD_STR" = "--" ] && DL_MOD_STR=$(echo "$NRCAINFO" | grep -i 'PCC' | grep -o -E '(256QAM|64QAM|16QAM|QPSK)' | head -n1 || echo "--")
+MOD="DL:${DL_MOD_STR} UL:${UL_MOD_STR}"
 
 DL_MIMO_NUM=$(echo "$NRCAINFO" | grep -i 'PCC' | grep -o -E 'DL_MIMO:[0-9]+' | awk -F':' '{print $2}' | head -n1)
-case "$DL_MIMO_NUM" in
-    0) MIMO="1x1" ;;
-    1) MIMO="2x2" ;;
-    2|3) MIMO="4x4" ;;
-    *) MIMO=$(echo "$NRCAINFO" | grep -i 'PCC' | grep -o -E '[1-4]x[1-4]' | head -n1) ;;
-esac
-[ -z "$MIMO" ] && MIMO="--"
+UL_MIMO_NUM=$(echo "$NRCAINFO" | grep -i 'PCC' | grep -o -E 'UL_MIMO:[0-9]+' | awk -F':' '{print $2}' | head -n1)
 
-BLER_RAW=$(echo "$BNRINFO" | grep -i 'DL BLER' | grep -o -E '[0-9.]+' | tail -n1)
-if [ -n "$BLER_RAW" ]; then
-    BLER_P="${BLER_RAW}%"
+get_mimo_string() {
+    case "$1" in
+        0) echo "1x1" ;;
+        1) echo "2x2" ;;
+        2|3) echo "4x4" ;;
+        *) echo "--" ;;
+    esac
+}
+
+DL_MIMO_STR=$(get_mimo_string "$DL_MIMO_NUM")
+UL_MIMO_STR=$(get_mimo_string "$UL_MIMO_NUM")
+[ "$DL_MIMO_STR" = "--" ] && DL_MIMO_STR=$(echo "$NRCAINFO" | grep -i 'PCC' | grep -o -E '[1-4]x[1-4]' | head -n1 || echo "--")
+MIMO="DL:${DL_MIMO_STR} UL:${UL_MIMO_STR}"
+
+DL_BLER_RAW=$(echo "$BNRINFO" | grep -i 'BLER' | grep -i -o -E 'DL BLER[: ]*[0-9.]+' | grep -o -E '[0-9.]+' | head -n1)
+UL_BLER_RAW=$(echo "$BNRINFO" | grep -i 'BLER' | grep -i -o -E 'UL BLER[: ]*[0-9.]+' | grep -o -E '[0-9.]+' | head -n1)
+[ -z "$DL_BLER_RAW" ] && DL_BLER_RAW="--"
+[ -z "$UL_BLER_RAW" ] && UL_BLER_RAW="--"
+if [ "$DL_BLER_RAW" != "--" ] || [ "$UL_BLER_RAW" != "--" ]; then
+    BLER_P="DL:${DL_BLER_RAW}% UL:${UL_BLER_RAW}%"
+    [ "$DL_BLER_RAW" = "--" ] && BLER_P="DL:-- UL:${UL_BLER_RAW}%"
+    [ "$UL_BLER_RAW" = "--" ] && BLER_P="DL:${DL_BLER_RAW}% UL:--"
+    [ "$DL_BLER_RAW" = "--" ] && [ "$UL_BLER_RAW" = "--" ] && BLER_P="--"
 else
     BLER_P="--"
 fi
