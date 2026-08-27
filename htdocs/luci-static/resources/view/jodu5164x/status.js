@@ -736,8 +736,8 @@ return view.extend({
                         var tempVal = parseInt(data.temp, 10);
                         if (!isNaN(tempVal)) {
                             var tCol = '#4ade80';
-                            if (tempVal >= 40 && tempVal <= 50) tCol = '#facc15';
-                            else if (tempVal > 50) tCol = '#ef4444';
+                            if (tempVal >= 41 && tempVal <= 45) tCol = '#facc15';
+                            else if (tempVal >= 46) tCol = '#ef4444';
                             
                             var tempEl = document.getElementById('ui-temp');
                             if (tempEl) {
@@ -826,8 +826,8 @@ return view.extend({
                     var curSinr = getVal('sinr');
 
                     if (curMod === '--') curMod = 'DL:-- UL:--';
-                    if (curMimo === '--') curMimo = 'DL:-- UL:--';
-                    if (curBler === '--') curBler = 'DL:-- UL:--';
+                    if (curMimo === '--') curMimo = '--';
+                    if (curBler === '--') curBler = '--';
 
                     var el;
                     el = document.getElementById('ui-duplex'); if (el) el.innerText = curDuplex;
@@ -872,39 +872,17 @@ return view.extend({
                     var uiBler = document.getElementById('ui-bler');
                     if (uiBler) {
                         var blerVal = curBler;
-                        if (blerVal !== 'DL:-- UL:--' && blerVal !== '--' && blerVal !== 'NA') {
-                            var dMatch = blerVal.match(/DL:([0-9.]+)%/);
-                            var uMatch = blerVal.match(/UL:([0-9.]+)%/);
-                            
-                            var getBlerCol = function(val) {
-                                if (isNaN(val)) return '#4ade80';
-                                if (val >= 10) return '#f43f5e';
-                                if (val > 0) return '#fbbf24';
-                                return '#4ade80';
-                            };
-
-                            if (dMatch || uMatch) {
-                                var dStr = 'DL:--';
-                                if (dMatch) {
-                                    var dCol = getBlerCol(parseFloat(dMatch[1]));
-                                    dStr = 'DL:<span style="color:' + dCol + '">' + dMatch[1] + '%</span>';
-                                }
-                                
-                                var uStr = 'UL:--';
-                                if (uMatch) {
-                                    var uCol = getBlerCol(parseFloat(uMatch[1]));
-                                    uStr = 'UL:<span style="color:' + uCol + '">' + uMatch[1] + '%</span>';
-                                }
-                                
-                                uiBler.innerHTML = dStr + ' ' + uStr;
-                                uiBler.style.color = ''; 
+                        uiBler.innerText = blerVal;
+                        if (blerVal !== '--' && blerVal !== 'NA' && blerVal !== 'DL:-- UL:--') {
+                            var parseNum = parseFloat(blerVal);
+                            if (!isNaN(parseNum)) {
+                                if (parseNum >= 10) uiBler.style.color = '#f43f5e';
+                                else if (parseNum > 0) uiBler.style.color = '#fbbf24';
+                                else uiBler.style.color = '#4ade80';
                             } else {
-                                var oldNum = parseFloat(blerVal);
-                                uiBler.innerText = blerVal;
-                                uiBler.style.color = getBlerCol(oldNum);
+                                uiBler.style.color = '#4ade80';
                             }
                         } else {
-                            uiBler.innerText = blerVal;
                             uiBler.style.color = (blerVal === 'DL:-- UL:--' || blerVal === '--' ? '#94a3b8' : '#4ade80');
                         }
                     }

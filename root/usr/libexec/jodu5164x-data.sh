@@ -25,7 +25,7 @@ fi
 
 STATUS=$(wget -q -O - -T 3 "http://$IP:8080/status.txt" 2>/dev/null | tr -d '\r')
 
-if ! echo "$STATUS" | grep -q -e '---UPTIME---' || ! echo "$STATUS" | grep -q -e '5164x-1.0.0-r2'; then
+if ! echo "$STATUS" | grep -q -e '---UPTIME---' || ! echo "$STATUS" | grep -q -e '5164x-1.0.0-r3'; then
     FAIL_COUNT=$(cat /tmp/odu_fail_count 2>/dev/null || echo "0")
     FAIL_COUNT=$((FAIL_COUNT + 1))
     echo "$FAIL_COUNT" > /tmp/odu_fail_count
@@ -130,19 +130,13 @@ get_mimo_string() {
 }
 
 DL_MIMO_STR=$(get_mimo_string "$DL_MIMO_NUM")
-UL_MIMO_STR=$(get_mimo_string "$UL_MIMO_NUM")
 [ "$DL_MIMO_STR" = "--" ] && DL_MIMO_STR=$(echo "$NRCAINFO" | grep -i 'PCC' | grep -o -E '[1-4]x[1-4]' | head -n1 || echo "--")
-MIMO="DL:${DL_MIMO_STR} UL:${UL_MIMO_STR}"
+MIMO="${DL_MIMO_STR}"
 
 DL_BLER_RAW=$(echo "$BNRINFO" | grep -i 'BLER' | grep -i -o -E 'DL BLER[: ]*[0-9.]+' | grep -o -E '[0-9.]+' | head -n1)
-UL_BLER_RAW=$(echo "$BNRINFO" | grep -i 'BLER' | grep -i -o -E 'UL BLER[: ]*[0-9.]+' | grep -o -E '[0-9.]+' | head -n1)
 [ -z "$DL_BLER_RAW" ] && DL_BLER_RAW="--"
-[ -z "$UL_BLER_RAW" ] && UL_BLER_RAW="--"
-if [ "$DL_BLER_RAW" != "--" ] || [ "$UL_BLER_RAW" != "--" ]; then
-    BLER_P="DL:${DL_BLER_RAW}% UL:${UL_BLER_RAW}%"
-    [ "$DL_BLER_RAW" = "--" ] && BLER_P="DL:-- UL:${UL_BLER_RAW}%"
-    [ "$UL_BLER_RAW" = "--" ] && BLER_P="DL:${DL_BLER_RAW}% UL:--"
-    [ "$DL_BLER_RAW" = "--" ] && [ "$UL_BLER_RAW" = "--" ] && BLER_P="--"
+if [ "$DL_BLER_RAW" != "--" ]; then
+    BLER_P="${DL_BLER_RAW}%"
 else
     BLER_P="--"
 fi
