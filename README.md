@@ -21,6 +21,6 @@ This package provides a real-time ODU monitoring for OpenWrt.
 ## Installation
 Grab the Latest from the [Releases](https://github.com/RummaanKhan/luci-app-jodu5164x-status/releases) page or directly install using:
 ```sh
-wget --no-check-certificate -O /tmp/luci-app-jodu5164x-status-1.0.0-r2.apk https://github.com/RummaanKhan/luci-app-jodu5164x-status/releases/download/v1.0.0-r2/luci-app-jodu5164x-status-1.0.0-r2.apk && apk add --allow-untrusted /tmp/luci-app-jodu5164x-status-1.0.0-r2.apk
+wget --no-check-certificate -O /tmp/luci-app-jodu5164x-status-1.0.0-r3.apk https://github.com/RummaanKhan/luci-app-jodu5164x-status/releases/download/v1.0.0-r3/luci-app-jodu5164x-status-1.0.0-r3.apk && apk add --allow-untrusted /tmp/luci-app-jodu5164x-status-1.0.0-r3.apk
 ```
    Go to **Status** -> **5G Dashboard** to view your stats!
