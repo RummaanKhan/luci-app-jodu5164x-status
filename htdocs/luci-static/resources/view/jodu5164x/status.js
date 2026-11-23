@@ -88,6 +88,54 @@ return view.extend({
                 box-shadow: 0 0 12px rgba(2, 132, 199, 0.6) !important;
             }
 
+            .btn-scan-cell {
+                background: rgba(56, 189, 248, 0.1) !important;
+                border: 1px solid rgba(56, 189, 248, 0.3) !important;
+                color: #38bdf8 !important;
+                cursor: pointer;
+                font-size: 11px !important;
+                font-weight: 600 !important;
+                padding: 5px 12px !important;
+                border-radius: 6px !important;
+                transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                gap: 6px !important;
+                min-width: 120px !important;
+                height: 30px !important;
+                line-height: 1 !important;
+                vertical-align: middle !important;
+            }
+            .btn-scan-cell:hover {
+                background: rgba(56, 189, 248, 0.2) !important;
+                border-color: rgba(56, 189, 248, 0.6) !important;
+                box-shadow: 0 0 10px rgba(56, 189, 248, 0.3) !important;
+            }
+            .btn-scan-cell:disabled {
+                opacity: 0.65 !important;
+                cursor: not-allowed !important;
+                pointer-events: none !important;
+            }
+            .scan-icon-wrap {
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                flex-shrink: 0 !important;
+                width: 14px !important;
+                height: 14px !important;
+            }
+            .scan-btn-text {
+                display: inline-block !important;
+                white-space: nowrap !important;
+                line-height: 1 !important;
+                vertical-align: middle !important;
+            }
+            @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+            @keyframes scan-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+            .spinning { animation: spin 0.9s linear infinite; transform-origin: center center; }
+            .scan-pulsing { animation: scan-pulse 1.1s ease-in-out infinite; }
+
             .sa-grid-top { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; margin-bottom: 20px; }
             
             .sa-card { 
@@ -301,7 +349,14 @@ return view.extend({
                             <svg style="width:13px;height:13px;" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
                             <span style="color:#ffffff !important;">Clear Locks</span>
                         </button>
-                        <span class="sa-badge" style="margin-left: 4px; background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.15); color: #94a3b8;"><span id="ui-neigh-count">0</span> Cells Found</span>
+                        <button class="btn action-btn btn-scan-cell" id="btn-scan-neigh" title="Click to scan neighbouring 5G cells">
+                            <span class="scan-icon-wrap">
+                                <svg id="icon-scan-spin" style="width:13px;height:13px;display:block;" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                                </svg>
+                            </span>
+                            <span id="ui-neigh-btn-text" class="scan-btn-text" style="color: #38bdf8 !important;"><span id="ui-neigh-count">0</span> Cells Found</span>
+                        </button>
                     </div>
                 </div>
                 <div class="sa-transparent-node" style="overflow-x: auto;">
@@ -317,8 +372,8 @@ return view.extend({
                         </thead>
                         <tbody id="ui-neighbor-tbody">
                             <tr>
-                                <td colspan="7" style="text-align: center; padding: 25px; color: #64748b; font-style: italic;">
-                                    Scanning for neighbouring 5G NR cells...
+                                <td colspan="5" style="text-align: center; padding: 25px; color: #64748b; font-style: italic;">
+                                    No neighbouring cells detected. Tap button above to scan.
                                 </td>
                             </tr>
                         </tbody>
@@ -660,6 +715,43 @@ return view.extend({
             });
         }
 
+        var btnScanNeigh = container.querySelector('#btn-scan-neigh');
+        if (btnScanNeigh) {
+            btnScanNeigh.addEventListener('click', function() {
+                if (btnScanNeigh.disabled) return;
+                btnScanNeigh.disabled = true;
+                var iconSpin = document.getElementById('icon-scan-spin');
+                var textEl = document.getElementById('ui-neigh-btn-text');
+                if (iconSpin) iconSpin.classList.add('spinning');
+                if (textEl) { textEl.innerText = 'Scanning...'; textEl.classList.add('scan-pulsing'); }
+
+                fs.exec_direct('/usr/libexec/jodu5164x-scan.sh').then(function(res) {
+                    btnScanNeigh.disabled = false;
+                    if (iconSpin) iconSpin.classList.remove('spinning');
+                    if (textEl) textEl.classList.remove('scan-pulsing');
+                    try {
+                        var raw = (typeof res === 'string') ? res : (res.stdout || '');
+                        var scanData = JSON.parse(raw);
+                        if (scanData && scanData.neighbors) {
+                            lastNeighbors = scanData.neighbors;
+                            lastNeighborsJson = JSON.stringify(scanData.neighbors);
+                            var currentArfcn = document.getElementById('ui-arfcn') ? document.getElementById('ui-arfcn').innerText : '';
+                            var currentPci = document.getElementById('ui-pcid') ? document.getElementById('ui-pcid').innerText : '';
+                            renderNeighbors(scanData.neighbors, currentArfcn, currentPci);
+                        }
+                    } catch(e) {}
+                    var count = (lastNeighbors && lastNeighbors.length) || 0;
+                    if (textEl) textEl.innerHTML = '<span id="ui-neigh-count">' + count + '</span> Cells Found';
+                }).catch(function(err) {
+                    btnScanNeigh.disabled = false;
+                    if (iconSpin) iconSpin.classList.remove('spinning');
+                    if (textEl) textEl.classList.remove('scan-pulsing');
+                    var count = (lastNeighbors && lastNeighbors.length) || 0;
+                    if (textEl) textEl.innerHTML = '<span id="ui-neigh-count">' + count + '</span> Cells Found';
+                });
+            });
+        }
+
         if (window.odu5164xUptimeTicker) clearInterval(window.odu5164xUptimeTicker);
         window.odu5164xUptimeTicker = setInterval(function() {
             if (isConfiguring) return;
@@ -689,6 +781,70 @@ return view.extend({
             var k = 1024, sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
             var i = Math.floor(Math.log(b) / Math.log(k));
             return parseFloat((b / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        var lastNeighbors = null;
+        var lastNeighborsJson = '';
+        var lastArfcn = '';
+        var lastPci = '';
+
+        function renderNeighbors(neighbors, currentArfcn, currentPci) {
+            var nTbody = document.getElementById('ui-neighbor-tbody');
+            var nCountEl = document.getElementById('ui-neigh-count');
+            if (!nTbody) return;
+            
+            if (neighbors && Array.isArray(neighbors) && neighbors.length > 0) {
+                if (nCountEl) nCountEl.innerText = neighbors.length;
+                
+                neighbors.sort(function(a, b) {
+                    var rA = parseInt(a.rsrp, 10) || -150;
+                    var rB = parseInt(b.rsrp, 10) || -150;
+                    return rB - rA; 
+                });
+                
+                var rows = '';
+                neighbors.forEach(function(n) {
+                    var nRsrp = parseInt(n.rsrp, 10) || -130;
+                    var nCol = '#f43f5e';
+                    if (nRsrp >= -85) nCol = '#4ade80';
+                    else if (nRsrp >= -100) nCol = '#fbbf24';
+                    
+                    var nRsrq = parseFloat(n.rsrq) || -20;
+                    var nRsrqCol = '#f43f5e';
+                    if (nRsrq >= -8) nRsrqCol = '#4ade80';
+                    else if (nRsrq >= -11) nRsrqCol = '#fbbf24';
+                    
+                    var isLocked = (currentArfcn == n.arfcn && currentPci == n.pci);
+                    
+                    rows += '<tr class="sa-tr" style="background: ' + (isLocked ? 'rgba(56,189,248,0.08)' : 'transparent') + ';">';
+                    rows += '<td class="sa-td val-highlight" style="padding: 6px 10px; width: 20%; text-align: center;">' + (n.arfcn || '--') + '</td>';
+                    rows += '<td class="sa-td val-highlight" style="padding: 6px 10px; width: 20%; text-align: center; color: #facc15;">' + (n.pci || '--') + '</td>';
+                    rows += '<td class="sa-td" style="padding: 6px 10px; width: 20%; text-align: center; color: ' + nCol + '; font-weight: 600; font-family: monospace;">' + (n.rsrp || '--') + ' dBm</td>';
+                    rows += '<td class="sa-td" style="padding: 6px 10px; width: 20%; text-align: center; color: ' + nRsrqCol + '; font-weight: 600; font-family: monospace;">' + (n.rsrq || '--') + ' dB</td>';
+                    rows += '<td class="sa-td" style="padding: 6px 14px; width: 20%; text-align: center;">';
+                    if (isLocked) {
+                        rows += '<span class="badge-active-cell" style="padding: 3px 8px !important; font-size: 10px !important;">ACTIVE CELL</span>';
+                    } else {
+                        rows += '<button class="btn btn-lock-cell" style="padding: 3px 10px !important; font-size: 10px !important; border-radius: 4px !important;" data-arfcn="' + n.arfcn + '" data-pci="' + n.pci + '">LOCK</button>';
+                    }
+                    rows += '</td></tr>';
+                });
+                nTbody.innerHTML = rows;
+
+                var lockButtons = nTbody.querySelectorAll('.btn-lock-cell');
+                lockButtons.forEach(function(btn) {
+                    btn.onclick = function() {
+                        var targetArfcn = this.getAttribute('data-arfcn');
+                        var targetPci = this.getAttribute('data-pci');
+                        openConfirmModal('Lock 5G Cell', 'Are you sure you want to lock to ARFCN <b>' + targetArfcn + '</b> & PCI <b>' + targetPci + '</b>?', function() {
+                            applyCellLock(targetArfcn, targetPci);
+                        });
+                    };
+                });
+            } else if (!nTbody.querySelector('.btn-lock-cell') && !nTbody.querySelector('.sa-tr')) {
+                if (nCountEl) nCountEl.innerText = '0';
+                nTbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 25px; color: #64748b; font-style: italic;">No neighbouring cells detected. Tap button above to scan.</td></tr>';
+            }
         }
 
         poll.add(function() {
@@ -930,17 +1086,76 @@ return view.extend({
                     if (uiTx) uiTx.innerText = formatBytes(tx);
 
                     if (data.scc_pcid && data.scc_pcid !== "0" && data.scc_pcid !== "--") {
-                        el = document.getElementById('ui-ca-status'); if (el) { el.innerText = 'Active (CA)'; el.style.color = '#03dac6'; }
-                        el = document.getElementById('ui-scc-band'); if (el) el.innerText = data.scc_band || 'n258';
-                        el = document.getElementById('ui-scc-bw'); if (el) el.innerText = (data.scc_bw || '100') + ' MHz';
+                        el = document.getElementById('ui-ca-status'); if (el) { el.innerText = 'CA Active'; el.style.color = '#03dac6'; }
+                        el = document.getElementById('ui-scc-band'); if (el) el.innerText = data.scc_band !== '--' ? data.scc_band : '--';
+                        el = document.getElementById('ui-scc-bw'); if (el) el.innerText = (data.scc_bw && data.scc_bw !== '--') ? data.scc_bw + ' MHz' : '--';
                         el = document.getElementById('ui-scc-arfcn'); if (el) el.innerText = data.scc_arfcn || '--';
                         el = document.getElementById('ui-scc-pcid'); if (el) el.innerText = data.scc_pcid;
-                        el = document.getElementById('ui-scc-mod'); if (el) el.innerText = data.scc_mod || '64QAM';
-                        el = document.getElementById('ui-scc-mimo'); if (el) el.innerText = data.scc_mimo || '2x2';
-                        el = document.getElementById('ui-scc-rsrp'); if (el) el.innerText = (data.scc_rsrp || '0') + ' dBm';
-                        el = document.getElementById('ui-scc-rsrq'); if (el) el.innerText = (data.scc_rsrq || '0') + ' dB';
-                        el = document.getElementById('ui-scc-sinr'); if (el) el.innerText = (data.scc_sinr || '0') + ' dB';
-                        el = document.getElementById('ui-scc-bler'); if (el) { var sb = data.scc_bler || '0'; el.innerText = sb; var sbn = parseFloat(sb); el.style.color = (isNaN(sbn) || sbn === 0) ? '#4ade80' : (sbn >= 10 ? '#f43f5e' : '#fbbf24'); }
+                        el = document.getElementById('ui-scc-mod'); if (el) el.innerText = (data.scc_mod && data.scc_mod !== '--') ? data.scc_mod : '--';
+                        el = document.getElementById('ui-scc-mimo'); if (el) el.innerText = (data.scc_mimo && data.scc_mimo !== '--') ? data.scc_mimo : '--';
+
+                        var sccRsrp = parseInt(data.scc_rsrp, 10);
+                        var sccRsrpEl = document.getElementById('ui-scc-rsrp');
+                        if (sccRsrpEl) {
+                            if (!isNaN(sccRsrp) && data.scc_rsrp !== '--') {
+                                sccRsrpEl.innerText = sccRsrp + ' dBm';
+                                var sccRsrpCol = '#f43f5e';
+                                if (sccRsrp >= -85) sccRsrpCol = '#4ade80';
+                                else if (sccRsrp >= -100) sccRsrpCol = '#fbbf24';
+                                sccRsrpEl.style.color = sccRsrpCol;
+                            } else {
+                                sccRsrpEl.innerText = '-- dBm';
+                                sccRsrpEl.style.color = '#94a3b8';
+                            }
+                        }
+
+                        var sccRsrq = parseInt(data.scc_rsrq, 10);
+                        var sccRsrqEl = document.getElementById('ui-scc-rsrq');
+                        if (sccRsrqEl) {
+                            if (!isNaN(sccRsrq) && data.scc_rsrq !== '--') {
+                                sccRsrqEl.innerText = sccRsrq + ' dB';
+                                var sccRsrqCol = '#f43f5e';
+                                if (sccRsrq >= -9) sccRsrqCol = '#4ade80';
+                                else if (sccRsrq >= -13) sccRsrqCol = '#fbbf24';
+                                sccRsrqEl.style.color = sccRsrqCol;
+                            } else {
+                                sccRsrqEl.innerText = '-- dB';
+                                sccRsrqEl.style.color = '#94a3b8';
+                            }
+                        }
+
+                        var sccSinr = parseInt(data.scc_sinr, 10);
+                        var sccSinrEl = document.getElementById('ui-scc-sinr');
+                        if (sccSinrEl) {
+                            if (!isNaN(sccSinr) && data.scc_sinr !== '--') {
+                                sccSinrEl.innerText = sccSinr + ' dB';
+                                var sccSinrCol = '#f43f5e';
+                                if (sccSinr >= 15) sccSinrCol = '#4ade80';
+                                else if (sccSinr >= 5) sccSinrCol = '#fbbf24';
+                                sccSinrEl.style.color = sccSinrCol;
+                            } else {
+                                sccSinrEl.innerText = '-- dB';
+                                sccSinrEl.style.color = '#94a3b8';
+                            }
+                        }
+
+                        var sccBlerEl = document.getElementById('ui-scc-bler');
+                        if (sccBlerEl) {
+                            var sb = data.scc_bler || '--';
+                            sccBlerEl.innerText = sb;
+                            if (sb !== '--' && sb !== 'NA') {
+                                var sbn = parseFloat(sb);
+                                if (!isNaN(sbn)) {
+                                    if (sbn >= 10) sccBlerEl.style.color = '#f43f5e';
+                                    else if (sbn > 0) sccBlerEl.style.color = '#fbbf24';
+                                    else sccBlerEl.style.color = '#4ade80';
+                                } else {
+                                    sccBlerEl.style.color = '#4ade80';
+                                }
+                            } else {
+                                sccBlerEl.style.color = '#94a3b8';
+                            }
+                        }
                     } else {
                         el = document.getElementById('ui-ca-status'); if (el) { el.innerText = 'Inactive'; el.style.color = '#94a3b8'; }
                         el = document.getElementById('ui-scc-band'); if (el) el.innerText = 'NA';
@@ -955,62 +1170,17 @@ return view.extend({
                         el = document.getElementById('ui-scc-bler'); if (el) el.innerText = 'NA';
                     }
 
-                    var nTbody = document.getElementById('ui-neighbor-tbody');
-                    var nCountEl = document.getElementById('ui-neigh-count');
-                    
-                    if (nTbody) {
-                        if (data.neighbors && Array.isArray(data.neighbors) && data.neighbors.length > 0) {
-                            if (nCountEl) nCountEl.innerText = data.neighbors.length;
-                            
-                            data.neighbors.sort(function(a, b) {
-                                var rA = parseInt(a.rsrp, 10) || -150;
-                                var rB = parseInt(b.rsrp, 10) || -150;
-                                return rB - rA; 
-                            });
-                            
-                            var rows = '';
-                            data.neighbors.forEach(function(n, idx) {
-                                var nRsrp = parseInt(n.rsrp, 10) || -130;
-                                var nCol = '#f43f5e';
-                                if (nRsrp >= -85) nCol = '#4ade80';
-                                else if (nRsrp >= -100) nCol = '#fbbf24';
-                                
-                                var nRsrq = parseFloat(n.rsrq) || -20;
-                                var nRsrqCol = '#f43f5e';
-                                if (nRsrq >= -8) nRsrqCol = '#4ade80';
-                                else if (nRsrq >= -11) nRsrqCol = '#fbbf24';
-                                
-                                var isLocked = (data.arfcn == n.arfcn && data.pcid == n.pci);
-                                
-                                rows += '<tr class="sa-tr" style="background: ' + (isLocked ? 'rgba(56,189,248,0.08)' : 'transparent') + ';">';
-                                rows += '<td class="sa-td val-highlight" style="padding: 6px 10px; width: 20%; text-align: center;">' + (n.arfcn || '--') + '</td>';
-                                rows += '<td class="sa-td val-highlight" style="padding: 6px 10px; width: 20%; text-align: center; color: #facc15;">' + (n.pci || '--') + '</td>';
-                                rows += '<td class="sa-td" style="padding: 6px 10px; width: 20%; text-align: center; color: ' + nCol + '; font-weight: 600; font-family: monospace;">' + (n.rsrp || '--') + ' dBm</td>';
-                                rows += '<td class="sa-td" style="padding: 6px 10px; width: 20%; text-align: center; color: ' + nRsrqCol + '; font-weight: 600; font-family: monospace;">' + (n.rsrq || '--') + ' dB</td>';
-                                rows += '<td class="sa-td" style="padding: 6px 14px; width: 20%; text-align: center;">';
-                                if (isLocked) {
-                                    rows += '<span class="badge-active-cell" style="padding: 3px 8px !important; font-size: 10px !important;">ACTIVE CELL</span>';
-                                } else {
-                                    rows += '<button class="btn btn-lock-cell" style="padding: 3px 10px !important; font-size: 10px !important; border-radius: 4px !important;" data-arfcn="' + n.arfcn + '" data-pci="' + n.pci + '">LOCK</button>';
-                                }
-                                rows += '</td></tr>';
-                            });
-                            nTbody.innerHTML = rows;
-
-                            var lockButtons = nTbody.querySelectorAll('.btn-lock-cell');
-                            lockButtons.forEach(function(btn) {
-                                btn.onclick = function() {
-                                    var targetArfcn = this.getAttribute('data-arfcn');
-                                    var targetPci = this.getAttribute('data-pci');
-                                    openConfirmModal('Lock 5G Cell', 'Are you sure you want to lock to ARFCN <b>' + targetArfcn + '</b> & PCI <b>' + targetPci + '</b>?', function() {
-                                        applyCellLock(targetArfcn, targetPci);
-                                    });
-                                };
-                            });
-                        } else if (!nTbody.querySelector('.btn-lock-cell') && !nTbody.querySelector('.sa-tr')) {
-                            if (nCountEl) nCountEl.innerText = '0';
-                            nTbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 25px; color: #64748b; font-style: italic;">No neighbouring cells detected in the current sector.</td></tr>';
+                    if (data.neighbors && Array.isArray(data.neighbors) && data.neighbors.length > 0) {
+                        var neighJson = JSON.stringify(data.neighbors);
+                        if (neighJson !== lastNeighborsJson || data.arfcn !== lastArfcn || data.pcid !== lastPci) {
+                            lastNeighbors = data.neighbors;
+                            lastNeighborsJson = neighJson;
+                            lastArfcn = data.arfcn;
+                            lastPci = data.pcid;
+                            renderNeighbors(data.neighbors, data.arfcn, data.pcid);
                         }
+                    } else if (!lastNeighbors || lastNeighbors.length === 0) {
+                        renderNeighbors([], data.arfcn, data.pcid);
                     }
                 } catch(e) {}
             });

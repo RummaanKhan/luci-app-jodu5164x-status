@@ -8,6 +8,7 @@
                 "/usr/libexec/jodu5164x_reboot.sh": [ "exec" ],
                 "/usr/libexec/jodu5164x_at.sh": [ "exec" ],
                 "/usr/libexec/jodu5164x_lock.sh": [ "exec" ],
+                "/usr/libexec/jodu5164x-scan.sh": [ "exec" ],
                 "/usr/libexec/jodu5164x-setup.sh": [ "exec" ],
                 "/bin/sh": [ "exec" ]
             }

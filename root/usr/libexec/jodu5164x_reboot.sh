@@ -1,5 +1,4 @@
 #!/bin/sh
-# /usr/libexec/jodu5164x_reboot.sh - Safely reboots JODU5164x ODU
 
 IP=$(/sbin/uci -q get jodu5164x.main.ip)
 [ -z "$IP" ] && IP=$(/sbin/uci -q get jodu5164x.main.host)

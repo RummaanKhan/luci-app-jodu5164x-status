@@ -1,5 +1,4 @@
 #!/bin/sh
-# /usr/libexec/jodu5164x_at.sh - Executes AT and CRI commands over Telnet on JODU5164x
 
 CMD="$1"
 [ -z "$CMD" ] && exit 1
@@ -12,7 +11,6 @@ USER=$(/sbin/uci -q get jodu5164x.main.user)
 PASS=$(/sbin/uci -q get jodu5164x.main.pass)
 [ -z "$PASS" ] && PASS=$(/sbin/uci -q get jodu5164x.main.telnet_password)
 
-# Determine whether to wrap with atcli or run directly
 FIRST_WORD=$(echo "$CMD" | awk '{print toupper($1)}')
 if echo "$FIRST_WORD" | grep -q '^AT'; then
     EXEC_CMD="/usr/bin/atcli '$CMD'"
@@ -20,7 +18,6 @@ else
     EXEC_CMD="$CMD"
 fi
 
-# Execute over Telnet
 OUTPUT=$( (
     if [ -n "$PASS" ]; then
         sleep 2
@@ -37,5 +34,4 @@ OUTPUT=$( (
     sleep 1
 ) | nc "$IP" 23 2>/dev/null )
 
-# Clean output
 echo "$OUTPUT" | awk '!/^[[:space:]]*$/ && !/'"$FIRST_WORD"'/ && !/root@/ && !/Login/ && !/Password/'

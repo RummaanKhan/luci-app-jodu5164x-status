@@ -1,11 +1,4 @@
 #!/bin/sh
-# jodu5164x-telnet-updater.sh
-# Background daemon that refreshes the telnet-derived cache (thermal zones,
-# CPU/RAM stats, nearby cells, cell lock status) every ~15s. This exists so
-# the main dashboard data script (jodu5164x-data.sh) NEVER has to block on
-# a slow telnet session itself - it just reads whatever this daemon last
-# wrote to the cache files. Without this, a telnet fetch taking 15-28s could
-# make fs.exec_direct() time out on the LuCI side ("exec_failed").
 
 UCI_PKG="jodu5164x"
 SYS_CACHE_FILE="/tmp/jodu5164x_sys_cache.raw"
@@ -20,7 +13,6 @@ fetch_once() {
     TELNET_USER=$(uci -q get ${UCI_PKG}.main.telnet_username)
     ENABLED=$(uci -q get ${UCI_PKG}.main.enabled); [ -z "$ENABLED" ] && ENABLED="1"
 
-    # monitoring paused - don't touch the ODU at all
     [ "$ENABLED" = "0" ] && return 0
 
     if ! command -v telnet >/dev/null 2>&1; then
@@ -67,7 +59,6 @@ fetch_once() {
     printf '%s' "$STATUS" > "$SYS_STATUS_FILE"
 }
 
-# Main loop - runs forever as a procd-managed background service.
 while true; do
     fetch_once
     sleep "$REFRESH_INTERVAL"

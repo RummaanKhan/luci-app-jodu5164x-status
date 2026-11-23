@@ -1,12 +1,4 @@
 #!/bin/sh
-# jodu5164x-set-config.sh
-# Writes the Settings-modal values straight to UCI and commits immediately.
-# Called via ubus file.exec with argv (no shell interpolation), so values
-# with spaces/special characters are safe.
-#
-# args: $1=host $2=username $3=password $4=telnet_port $5=telnet_password
-#       $6=reboot_schedule_enabled (0/1) $7=reboot_schedule_time (HH:MM)
-#       $8=telnet_username
 
 UCI_PKG="jodu5164x"
 CRON_FILE="/etc/crontabs/root"
@@ -22,7 +14,6 @@ uci set ${UCI_PKG}.main.reboot_schedule_time="$7"
 uci set ${UCI_PKG}.main.telnet_username="$8"
 uci commit ${UCI_PKG}
 
-# ---- manage the scheduled-reboot cron entry ----
 touch "$CRON_FILE"
 sed -i "\\|${CRON_TAG}|d" "$CRON_FILE"
 

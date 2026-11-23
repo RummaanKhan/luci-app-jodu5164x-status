@@ -1,12 +1,4 @@
 #!/bin/sh
-# jodu5164x-cell-lock.sh
-# Locks the modem to a specific cell (by PCI+ARFCN) or unlocks it, via
-# telnet + cricli. Uses the same UCI-configured host/telnet settings as
-# the main collector script.
-#
-# args: $1 = "lock" | "unlock"
-#       $2 = PCI    (required when action=lock)
-#       $3 = ARFCN  (required when action=lock)
 
 UCI_PKG="jodu5164x"
 ODU_HOST=$(uci -q get ${UCI_PKG}.main.host); [ -z "$ODU_HOST" ] && ODU_HOST="192.168.225.1"
@@ -58,7 +50,6 @@ OUT=$(
 } | $RUN 2>/dev/null
 )
 
-# collapse to a single line and JSON-escape for safe embedding
 ESC=$(printf '%s' "$OUT" | tr '\r\n' '  ' | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/  */ /g')
 
 echo "{\"result\":\"OK\",\"output\":\"${ESC}\"}"

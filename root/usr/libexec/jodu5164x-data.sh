@@ -25,7 +25,7 @@ fi
 
 STATUS=$(wget -q -O - -T 3 "http://$IP:8080/status.txt" 2>/dev/null | tr -d '\r')
 
-if ! echo "$STATUS" | grep -q -e '---UPTIME---' || ! echo "$STATUS" | grep -q -e '5164x-1.0.0-r3'; then
+if ! echo "$STATUS" | grep -q -e '---UPTIME---' || ! echo "$STATUS" | grep -q -e '5164x-1.0.0-r4'; then
     FAIL_COUNT=$(cat /tmp/odu_fail_count 2>/dev/null || echo "0")
     FAIL_COUNT=$((FAIL_COUNT + 1))
     echo "$FAIL_COUNT" > /tmp/odu_fail_count
@@ -53,10 +53,10 @@ fi
 STATUS=$(printf '%s' "$STATUS" | tr -d '\r')
 
 BNRINFO=$(echo "$STATUS" | sed -n '/---BNRINFO---/,/---NRCAINFO---/p')
-NRCAINFO=$(echo "$STATUS" | sed -n '/---NRCAINFO---/,/---CRI_CELL---/p')
+NRCAINFO=$(echo "$STATUS" | sed -n '/---NRCAINFO---/,/---BNRCELLH---/p')
+BNRCELLH=$(echo "$STATUS" | sed -n '/---BNRCELLH---/,/---CRI_CELL---/p')
 CRI_CELL=$(echo "$STATUS" | sed -n '/---CRI_CELL---/,/---CRI_BAND---/p')
-CRI_BAND=$(echo "$STATUS" | sed -n '/---CRI_BAND---/,/---BNRCELLH---/p')
-BNRCELLH=$(echo "$STATUS" | sed -n '/---BNRCELLH---/,/---CPU---/p')
+CRI_BAND=$(echo "$STATUS" | sed -n '/---CRI_BAND---/,/---NET---/p')
 
 NR5G_INFO=$(echo "$CRI_CELL" | sed -n '/---------- NR5G Info ----------/,$p')
 
@@ -152,20 +152,33 @@ if [ -n "$SCC_LINE" ] && ! echo "$SCC_LINE" | grep -q '<NA>'; then
     SCC_BAND=$(echo "$SCC_LINE" | grep -o -E 'Band:[a-zA-Z0-9]+' | awk -F':' '{print $2}')
     [ -z "$SCC_BAND" ] && SCC_BAND="--"
     SCC_BW=$(echo "$SCC_LINE" | grep -o -E '[0-9]+MHz' | tr -d 'MHz' | head -n1)
+    [ -z "$SCC_BW" ] && SCC_BW=$(echo "$SCC_LINE" | grep -o -E 'BW:[0-9]+' | awk -F':' '{print $2}' | head -n1)
     [ -z "$SCC_BW" ] && SCC_BW="--"
     SCC_PCID=$(echo "$SCC_LINE" | grep -o -E 'PCI:[0-9]+' | awk -F':' '{print $2}' | head -n1)
     [ -z "$SCC_PCID" ] && SCC_PCID="--"
-    SCC_ARFCN=$(echo "$SCC_LINE" | grep -o -E '(ARFCN|Freq)[: ]+[0-9]+' | awk '{print $2}' | head -n1)
+    SCC_ARFCN=$(echo "$SCC_LINE" | grep -o -E 'EARFCN:[0-9]+' | awk -F':' '{print $2}' | head -n1)
+    [ -z "$SCC_ARFCN" ] && SCC_ARFCN=$(echo "$SCC_LINE" | grep -o -E '(ARFCN|Freq)[: ]+[0-9]+' | awk '{print $2}' | head -n1)
     [ -z "$SCC_ARFCN" ] && SCC_ARFCN="--"
-    SCC_RSRP=$(echo "$SCC_LINE" | grep -o -E 'RSRP[: ]+[-0-9]+' | awk '{print $2}' | head -n1)
+    SCC_RSRP=$(echo "$SCC_LINE" | grep -o -E 'RSRP[: ]*[-0-9]+' | grep -o -E '[-0-9]+$' | head -n1)
     [ -z "$SCC_RSRP" ] && SCC_RSRP="--"
-    SCC_RSRQ="--"
-    SCC_SINR=$(echo "$SCC_LINE" | grep -o -E 'SINR[: ]+[-0-9]+' | awk '{print $2}' | head -n1)
+    SCC_RSRQ=$(echo "$SCC_LINE" | grep -o -E 'RSRQ[: ]*[-0-9]+' | grep -o -E '[-0-9]+$' | head -n1)
+    [ -z "$SCC_RSRQ" ] && SCC_RSRQ="--"
+    SCC_SINR=$(echo "$SCC_LINE" | grep -o -E 'SINR[: ]*[-0-9]+' | grep -o -E '[-0-9]+$' | head -n1)
     [ -z "$SCC_SINR" ] && SCC_SINR="--"
-    SCC_BLER="--"
-    SCC_MOD=$(echo "$SCC_LINE" | grep -o -E '(256QAM|64QAM|16QAM|QPSK)' | head -n1)
+    SCC_DL_BLER=$(echo "$SCC_LINE" | grep -o -E 'DL_BLER[: ]*[0-9.]+' | grep -o -E '[0-9.]+$' | head -n1)
+    [ -z "$SCC_DL_BLER" ] && SCC_DL_BLER="--"
+    if [ "$SCC_DL_BLER" != "--" ]; then
+        SCC_BLER="${SCC_DL_BLER}%"
+    else
+        SCC_BLER="--"
+    fi
+    SCC_DL_MOD_NUM=$(echo "$SCC_LINE" | grep -o -E 'DL_MOD:[0-9]+' | awk -F':' '{print $2}' | head -n1)
+    SCC_MOD=$(get_mod_string "$SCC_DL_MOD_NUM")
+    [ "$SCC_MOD" = "--" ] && SCC_MOD=$(echo "$SCC_LINE" | grep -o -E '(256QAM|64QAM|16QAM|QPSK)' | head -n1)
     [ -z "$SCC_MOD" ] && SCC_MOD="--"
-    SCC_MIMO=$(echo "$SCC_LINE" | grep -o -E '[1-4]x[1-4]' | head -n1)
+    SCC_DL_MIMO_NUM=$(echo "$SCC_LINE" | grep -o -E 'DL_MIMO:[0-9]+' | awk -F':' '{print $2}' | head -n1)
+    SCC_MIMO=$(get_mimo_string "$SCC_DL_MIMO_NUM")
+    [ "$SCC_MIMO" = "--" ] && SCC_MIMO=$(echo "$SCC_LINE" | grep -o -E '[1-4]x[1-4]' | head -n1)
     [ -z "$SCC_MIMO" ] && SCC_MIMO="--"
 else
     SCC_BAND="--"
@@ -196,10 +209,16 @@ NEIGHBORS_JSON=$(printf '%s\n' "$BNRCELLH" | awk '
 ')
 [ -z "$NEIGHBORS_JSON" ] && NEIGHBORS_JSON="[]"
 
+NET_LINE=$(echo "$STATUS" | sed -n '/---NET---/,/---CPU---/p' | grep -v -e '---' | head -n1 | tr -d '\r')
+RX_BYTES=$(echo "$NET_LINE" | awk '{print $1}')
+TX_BYTES=$(echo "$NET_LINE" | awk '{print $2}')
+[ -z "$RX_BYTES" ] && RX_BYTES="0"
+[ -z "$TX_BYTES" ] && TX_BYTES="0"
+
 CPU=$(echo "$STATUS" | sed -n '/---CPU---/,/---TEMP---/p' | grep -v -e '---' | head -n1 | tr -d '\r\n')
 [ -z "$CPU" ] && CPU="0"
 
-RAW_TEMP=$(echo "$STATUS" | sed -n '/---TEMP---/,/---NET---/p' | grep -v -e '---' | head -n1 | tr -d '\r\n')
+RAW_TEMP=$(echo "$STATUS" | sed -n '/---TEMP---/,/---UPTIME---/p' | grep -v -e '---' | head -n1 | tr -d '\r\n')
 if [ -n "$RAW_TEMP" ] && [ "$RAW_TEMP" -gt 1000 ] 2>/dev/null; then
     TEMP=$((RAW_TEMP / 1000))
 elif [ -n "$RAW_TEMP" ]; then
@@ -207,12 +226,6 @@ elif [ -n "$RAW_TEMP" ]; then
 else
     TEMP="0"
 fi
-
-NET_LINE=$(echo "$STATUS" | sed -n '/---NET---/,/---UPTIME---/p' | grep -v -e '---' | head -n1 | tr -d '\r')
-RX_BYTES=$(echo "$NET_LINE" | awk '{print $1}')
-TX_BYTES=$(echo "$NET_LINE" | awk '{print $2}')
-[ -z "$RX_BYTES" ] && RX_BYTES="0"
-[ -z "$TX_BYTES" ] && TX_BYTES="0"
 
 UPTIME=$(echo "$STATUS" | sed -n '/---UPTIME---/,/---MODEL---/p' | grep -v -e '---' | head -n1 | tr -d '\r\n')
 MODEL=$(echo "$STATUS" | sed -n '/---MODEL---/,/---VERSION---/p' | grep -v -e '---' | head -n1 | tr -d '\r\n')

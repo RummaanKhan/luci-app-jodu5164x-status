@@ -1,6 +1,4 @@
 #!/bin/sh
-# jodu5164x_lock.sh
-# Locks or unlocks 5G NR Cell on Sercomm JODU5164x using cricli
 
 IP=$(/sbin/uci -q get jodu5164x.main.ip)
 [ -z "$IP" ] && IP=$(/sbin/uci -q get jodu5164x.main.host)

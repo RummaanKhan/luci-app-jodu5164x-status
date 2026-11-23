@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-jodu5164x-status
 PKG_VERSION:=1.0.0
-PKG_RELEASE:=3
+PKG_RELEASE:=4
 PKG_LICENSE:=GPL-3.0
 
 include $(INCLUDE_DIR)/package.mk
@@ -40,6 +40,7 @@ define Package/luci-app-jodu5164x-status/install
 	$(INSTALL_DIR) $(1)/usr/libexec
 	$(INSTALL_BIN) ./root/usr/libexec/jodu5164x-data.sh $(1)/usr/libexec/
 	$(INSTALL_BIN) ./root/usr/libexec/jodu5164x-setup.sh $(1)/usr/libexec/
+	$(INSTALL_BIN) ./root/usr/libexec/jodu5164x-scan.sh $(1)/usr/libexec/
 	$(INSTALL_BIN) ./root/usr/libexec/jodu5164x_lock.sh $(1)/usr/libexec/
 	$(INSTALL_BIN) ./root/usr/libexec/jodu5164x_at.sh $(1)/usr/libexec/
 	$(INSTALL_BIN) ./root/usr/libexec/jodu5164x_reboot.sh $(1)/usr/libexec/

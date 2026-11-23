@@ -1,8 +1,4 @@
 #!/bin/sh
-# jodu5164x-reboot.sh
-# Telnets into the ODU and issues a plain "reboot" command.
-# Uses the same UCI-configured host/telnet port/password as the main
-# collector script.
 
 UCI_PKG="jodu5164x"
 ODU_HOST=$(uci -q get ${UCI_PKG}.main.host); [ -z "$ODU_HOST" ] && ODU_HOST="192.168.225.1"
